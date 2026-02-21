@@ -422,7 +422,9 @@ input[type="range"]::-webkit-slider-thumb {
   // ─── State ───
   const debugToggle = $('debug-mode');
   let audioCtx      = null;   // Web Audio context (created on user tap)
-  let silentOsc     = null;   // Silent oscillator keeping audio session alive
+  let silentOsc     = null;   // Silent oscillator (Web Audio backup)
+  let silentAudio   = null;   // HTML5 <audio> element playing silence.mp3
+  let wakePingId    = null;   // Interval ID for periodic wake-up pings
   let fileList      = [];     // Array of filenames from filelist.json
   let isRunning     = false;
   let debugMode     = false;
@@ -472,34 +474,99 @@ input[type="range"]::-webkit-slider-thumb {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  //  iOS Background Persistence — Silent Audio Loop
+  //  iOS Background Persistence — Multi-Layer Strategy
   //
-  //  iOS Safari suspends JS timers when the screen locks. To prevent
-  //  this, we keep an AudioContext alive with a silent oscillator
-  //  (gain = 0). As long as the audio session is active, the browser
-  //  process stays awake and timers continue to fire.
+  //  iOS Safari aggressively suspends JS when the screen locks.
+  //  A single silent oscillator is no longer sufficient on modern iOS.
+  //  We use FOUR layers to maximize survival:
   //
-  //  CRITICAL: The AudioContext MUST be created inside a user gesture
-  //  handler (click/touchend) to satisfy iOS autoplay policy.
+  //  Layer 1: HTML5 <audio> element looping a real silence.mp3 file.
+  //           iOS treats <audio> playback as a "real" media session
+  //           and is far less likely to suspend it vs Web Audio API.
+  //
+  //  Layer 2: Media Session API — registers metadata so the OS
+  //           recognizes this page as an active media player (shows
+  //           in Control Center / lock screen media controls).
+  //
+  //  Layer 3: Web Audio API silent oscillator (legacy backup).
+  //
+  //  Layer 4: Periodic wake-up pings — every 5 seconds, forcibly
+  //           resume the AudioContext and re-trigger the silent audio
+  //           if it was paused by the OS.
+  //
+  //  CRITICAL: Everything MUST be initiated from a user gesture
+  //  (click/touchend) to satisfy iOS autoplay policy.
   // ═══════════════════════════════════════════════════════════════════
 
   function createAudioContext() {
-    // Must be called from a user gesture (click)
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // ── Layer 1: HTML5 <audio> element with looping silent MP3 ──
+    // This is the PRIMARY keep-alive mechanism. iOS treats <audio>
+    // element playback as a legitimate media session.
+    silentAudio = new Audio('audio/silence.mp3');
+    silentAudio.loop = true;
+    silentAudio.volume = 0.01;  // near-silent but not zero (iOS may optimize away zero)
+    silentAudio.setAttribute('playsinline', '');
+    silentAudio.play().catch(() => {});
 
-    // Create silent oscillator → keeps audio session alive on iOS lock screen
+    // ── Layer 2: Media Session API ──
+    // Tell the OS we're a media player. This puts us in Control Center
+    // and signals iOS not to suspend our audio session.
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'Lucid Dreamer',
+        artist: '清醒夢誘發中...',
+        album: 'Sleep Session',
+      });
+      // Handle play/pause from lock screen controls
+      navigator.mediaSession.setActionHandler('play', () => {
+        silentAudio.play().catch(() => {});
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        // Don't actually pause — keep running
+        silentAudio.play().catch(() => {});
+      });
+    }
+
+    // ── Layer 3: Web Audio API silent oscillator (backup) ──
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     silentOsc = audioCtx.createOscillator();
     const silentGain = audioCtx.createGain();
-    silentGain.gain.value = 0;  // completely silent
+    silentGain.gain.value = 0;
     silentOsc.connect(silentGain);
     silentGain.connect(audioCtx.destination);
     silentOsc.start();
 
-    // iOS may suspend AudioContext; resume it on visibility change
-    document.addEventListener('visibilitychange', () => {
+    // ── Layer 4: Periodic wake-up pings ──
+    // Every 5 seconds, aggressively re-assert our audio session.
+    // If iOS suspended our AudioContext, resume it. If <audio> paused, replay.
+    wakePingId = setInterval(() => {
+      // Resume AudioContext if suspended
       if (audioCtx && audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
+      // Re-start silent audio if it was paused by the OS
+      if (silentAudio && silentAudio.paused) {
+        silentAudio.play().catch(() => {});
+      }
+      // Tiny Web Audio "ping" — create a very short buffer and play it
+      // This creates audio activity that iOS cannot ignore
+      if (audioCtx && audioCtx.state === 'running') {
+        const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        const g = audioCtx.createGain();
+        g.gain.value = 0;
+        src.connect(g);
+        g.connect(audioCtx.destination);
+        src.start();
+      }
+    }, 5000);
+
+    // Also resume on visibility change (user unlocks screen)
+    document.addEventListener('visibilitychange', () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      if (silentAudio && silentAudio.paused) silentAudio.play().catch(() => {});
     });
   }
 
@@ -663,7 +730,9 @@ input[type="range"]::-webkit-slider-thumb {
     isRunning = false;
     if (countdownId) { clearTimeout(countdownId); countdownId = null; }
 
-    // Clean up audio context
+    // Clean up all persistence layers
+    if (wakePingId) { clearInterval(wakePingId); wakePingId = null; }
+    if (silentAudio) { silentAudio.pause(); silentAudio.src = ''; silentAudio = null; }
     if (silentOsc) { silentOsc.stop(); silentOsc = null; }
     if (audioCtx) { audioCtx.close(); audioCtx = null; }
 
