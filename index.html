@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Lucid Dreamer – 清醒夢誘發工具">
+<title>Lucid Dreamer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────── Reset & Base ───────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-deep: #0a0a1a;
+  --bg-card: rgba(255, 255, 255, 0.04);
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --accent: #7c5cff;
+  --accent-glow: rgba(124, 92, 255, 0.35);
+  --accent-soft: #a78bfa;
+  --text: #e4e4f0;
+  --text-dim: #8888a8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --radius: 16px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg-deep);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(124, 92, 255, 0.15), transparent),
+    radial-gradient(ellipse 50% 40% at 80% 90%, rgba(99, 102, 241, 0.1), transparent),
+    var(--bg-deep);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1rem 3rem;
+}
+
+/* ───────────────────────────── Typography ───────────────────────────── */
+h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #c4b5fd, #818cf8, #7c5cff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.25rem;
+}
+.subtitle { font-size: 0.8rem; color: var(--text-dim); font-weight: 300; margin-bottom: 1.5rem; }
+
+/* ───────────────────────────── Glass Card ───────────────────────────── */
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: border-color 0.3s;
+}
+.card:hover { border-color: rgba(255,255,255,0.12); }
+
+.card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.card-title::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ───────────────────────────── Controls ───────────────────────────── */
+.control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+.control-row:last-child { margin-bottom: 0; }
+
+.control-label {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--text);
+}
+.control-label small {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  font-weight: 300;
+  margin-top: 2px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 130px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.1);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  cursor: pointer;
+}
+.range-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-soft);
+  min-width: 3rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ───────────────────────────── Status Display ───────────────────────── */
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.status-item {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 0.75rem;
+  text-align: center;
+}
+.status-item.wide { grid-column: 1 / -1; }
+.status-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+}
+.status-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.status-value.countdown {
+  font-size: 2rem;
+  background: linear-gradient(135deg, #c4b5fd, #7c5cff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ───────────────────────────── Big Button ───────────────────────────── */
+.start-btn {
+  width: 100%;
+  max-width: 420px;
+  padding: 1rem;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+.start-btn.ready {
+  background: linear-gradient(135deg, #7c5cff, #6366f1);
+  color: #fff;
+  box-shadow: 0 4px 24px var(--accent-glow);
+}
+.start-btn.ready:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+.start-btn.running {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(239, 68, 68, 0.3);
+}
+.start-btn.running:active { transform: scale(0.97); }
+
+/* Pulse animation when active */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.start-btn.running::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  border: 2px solid rgba(239, 68, 68, 0.5);
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+/* ───────────────────────────── Log ───────────────────────────── */
+.log-area {
+  width: 100%;
+  max-width: 420px;
+  max-height: 120px;
+  overflow-y: auto;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+.log-area .log-entry { margin-bottom: 2px; }
+.log-area .log-entry.played { color: var(--success); }
+.log-area .log-entry.skipped { color: var(--warning); }
+
+/* ───────────────────────────── Debug Toggle ───────────────────────────── */
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border-glass);
+}
+.debug-label {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--warning);
+}
+.debug-label small {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  font-weight: 300;
+  margin-top: 2px;
+}
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  transition: background 0.3s;
+}
+.toggle .slider::before {
+  content: '';
+  position: absolute;
+  left: 3px; top: 3px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.3s;
+}
+.toggle input:checked + .slider {
+  background: var(--warning);
+}
+.toggle input:checked + .slider::before {
+  transform: translateX(20px);
+}
+
+/* ───────────────────────────── Scrollbar ───────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+/* ───────────────────────────── Footer ───────────────────────────── */
+.footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.15);
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<h1>🌙 Lucid Dreamer</h1>
+<p class="subtitle">清醒夢誘發工具 — PoC</p>
+
+<!-- ─── Settings ─── -->
+<div class="card" id="settings-card">
+  <div class="card-title">設定</div>
+
+  <div class="control-row">
+    <div class="control-label">入睡緩衝<small>首次觸發前的等待時間</small></div>
+    <input type="range" id="initial-delay" min="1" max="60" value="20" step="1">
+    <span class="range-value" id="initial-delay-val">20 min</span>
+  </div>
+
+  <div class="control-row">
+    <div class="control-label">最小間隔<small>循環間最短等待</small></div>
+    <input type="range" id="min-interval" min="1" max="30" value="5" step="1">
+    <span class="range-value" id="min-interval-val">5 min</span>
+  </div>
+
+  <div class="control-row">
+    <div class="control-label">最大間隔<small>循環間最長等待</small></div>
+    <input type="range" id="max-interval" min="2" max="60" value="15" step="1">
+    <span class="range-value" id="max-interval-val">15 min</span>
+  </div>
+
+  <div class="control-row">
+    <div class="control-label">音量上限<small>漸強最大音量</small></div>
+    <input type="range" id="volume-cap" min="5" max="100" value="40" step="5">
+    <span class="range-value" id="volume-cap-val">40%</span>
+  </div>
+
+  <div class="control-row">
+    <div class="control-label">觸發機率<small>每次循環播放的機率</small></div>
+    <input type="range" id="probability" min="10" max="100" value="30" step="5">
+    <span class="range-value" id="probability-val">30%</span>
+  </div>
+
+  <div class="debug-row">
+    <div class="debug-label">⚡ Debug 模式<small>跳過延遲與機率，連續播放</small></div>
+    <label class="toggle">
+      <input type="checkbox" id="debug-mode">
+      <span class="slider"></span>
+    </label>
+  </div>
+</div>
+
+<!-- ─── Status ─── -->
+<div class="card">
+  <div class="card-title">狀態</div>
+  <div class="status-grid">
+    <div class="status-item wide">
+      <div class="status-label">倒數計時</div>
+      <div class="status-value countdown" id="countdown">--:--</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">目前階段</div>
+      <div class="status-value" id="phase" style="font-size:0.85rem;">待機</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">已觸發</div>
+      <div class="status-value" id="trigger-count">0</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Start Button ─── -->
+<button class="start-btn ready" id="start-btn">▶  開始</button>
+
+<!-- ─── Log ─── -->
+<div class="log-area" id="log-area">
+  <div class="log-entry">等待開始...</div>
+</div>
+
+<div class="footer">Lucid Dreamer PoC · GitHub Pages Edition</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+//  Lucid Dreamer — iOS-optimized lucid dream induction engine
+// ═══════════════════════════════════════════════════════════════════════
+
+(function () {
+  'use strict';
+
+  // ─── DOM refs ───
+  const $ = id => document.getElementById(id);
+  const startBtn       = $('start-btn');
+  const countdownEl    = $('countdown');
+  const phaseEl        = $('phase');
+  const triggerCountEl = $('trigger-count');
+  const logArea        = $('log-area');
+  const settingsCard   = $('settings-card');
+
+  // Sliders
+  const sliders = {
+    initialDelay: { el: $('initial-delay'), valEl: $('initial-delay-val'), fmt: v => `${v} min` },
+    minInterval:  { el: $('min-interval'),  valEl: $('min-interval-val'),  fmt: v => `${v} min` },
+    maxInterval:  { el: $('max-interval'),  valEl: $('max-interval-val'),  fmt: v => `${v} min` },
+    volumeCap:    { el: $('volume-cap'),    valEl: $('volume-cap-val'),    fmt: v => `${v}%` },
+    probability:  { el: $('probability'),   valEl: $('probability-val'),   fmt: v => `${v}%` },
+  };
+
+  // Sync slider display
+  Object.values(sliders).forEach(s => {
+    s.el.addEventListener('input', () => { s.valEl.textContent = s.fmt(s.el.value); });
+  });
+
+  // ─── State ───
+  const debugToggle = $('debug-mode');
+  let audioCtx      = null;   // Web Audio context (created on user tap)
+  let silentOsc     = null;   // Silent oscillator keeping audio session alive
+  let fileList      = [];     // Array of filenames from filelist.json
+  let isRunning     = false;
+  let debugMode     = false;
+  let triggerCount  = 0;
+  let countdownId   = null;   // requestAnimationFrame / setTimeout id
+  let targetTime    = 0;      // Unix ms when current wait ends
+
+  // ─── Helpers ───
+  function getVal(key) { return Number(sliders[key].el.value); }
+
+  function log(msg, cls = '') {
+    const now = new Date();
+    const ts = now.toLocaleTimeString('zh-TW', { hour12: false });
+    const div = document.createElement('div');
+    div.className = 'log-entry' + (cls ? ` ${cls}` : '');
+    div.textContent = `[${ts}] ${msg}`;
+    logArea.appendChild(div);
+    logArea.scrollTop = logArea.scrollHeight;
+  }
+
+  function formatTime(ms) {
+    if (ms <= 0) return '00:00';
+    const totalSec = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function randomInRange(minMin, maxMin) {
+    // Returns ms for a random duration between minMin and maxMin minutes
+    const lo = Math.min(minMin, maxMin);
+    const hi = Math.max(minMin, maxMin);
+    return (lo + Math.random() * (hi - lo)) * 60 * 1000;
+  }
+
+  // ─── Load file list ───
+  async function loadFileList() {
+    try {
+      const res = await fetch('filelist.json');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      fileList = await res.json();
+      log(`已載入 ${fileList.length} 個音訊檔`);
+    } catch (e) {
+      log(`⚠️ 無法載入 filelist.json: ${e.message}`);
+      fileList = [];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  iOS Background Persistence — Silent Audio Loop
+  //
+  //  iOS Safari suspends JS timers when the screen locks. To prevent
+  //  this, we keep an AudioContext alive with a silent oscillator
+  //  (gain = 0). As long as the audio session is active, the browser
+  //  process stays awake and timers continue to fire.
+  //
+  //  CRITICAL: The AudioContext MUST be created inside a user gesture
+  //  handler (click/touchend) to satisfy iOS autoplay policy.
+  // ═══════════════════════════════════════════════════════════════════
+
+  function createAudioContext() {
+    // Must be called from a user gesture (click)
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Create silent oscillator → keeps audio session alive on iOS lock screen
+    silentOsc = audioCtx.createOscillator();
+    const silentGain = audioCtx.createGain();
+    silentGain.gain.value = 0;  // completely silent
+    silentOsc.connect(silentGain);
+    silentGain.connect(audioCtx.destination);
+    silentOsc.start();
+
+    // iOS may suspend AudioContext; resume it on visibility change
+    document.addEventListener('visibilitychange', () => {
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  Audio Playback with Fade-in Ramp
+  //
+  //  Uses Web Audio API GainNode for a smooth 2-second linear ramp
+  //  from silence to the user-configured volume cap. This prevents
+  //  sudden loud sounds that could jolt the user awake.
+  // ═══════════════════════════════════════════════════════════════════
+
+  async function playRandomTrack() {
+    if (!fileList.length || !audioCtx) return;
+
+    const file = fileList[Math.floor(Math.random() * fileList.length)];
+    const url = `audio/${file}`;
+
+    try {
+      const res = await fetch(url);
+      const arrayBuf = await res.arrayBuffer();
+      const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuf;
+
+      // Fade-in gain node: 0 → volumeCap over 2 seconds (skip in debug)
+      const gainNode = audioCtx.createGain();
+      const volumeCap = getVal('volumeCap') / 100;
+      if (debugMode) {
+        gainNode.gain.value = volumeCap;
+      } else {
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(volumeCap, audioCtx.currentTime + 2);
+      }
+
+      source.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      source.start();
+
+      // In debug mode, schedule next track when this one ends
+      if (debugMode) {
+        source.onended = () => {
+          if (isRunning && debugMode) {
+            setTimeout(() => playRandomTrack(), 500);
+          }
+        };
+      }
+
+      triggerCount++;
+      triggerCountEl.textContent = triggerCount;
+      log(`▶ 播放: ${file.slice(0, 8)}...`, 'played');
+    } catch (e) {
+      log(`❌ 播放失敗: ${e.message}`);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  Countdown Timer
+  //
+  //  Uses a 1-second setTimeout loop instead of setInterval for
+  //  better iOS compatibility. The countdown compares against a
+  //  target timestamp so accumulated drift doesn't matter.
+  // ═══════════════════════════════════════════════════════════════════
+
+  function startCountdown(durationMs, label, onComplete) {
+    targetTime = Date.now() + durationMs;
+    phaseEl.textContent = label;
+
+    function tick() {
+      if (!isRunning) return;
+      const remaining = targetTime - Date.now();
+      countdownEl.textContent = formatTime(remaining);
+
+      if (remaining <= 0) {
+        countdownEl.textContent = '00:00';
+        onComplete();
+      } else {
+        countdownId = setTimeout(tick, 1000);
+      }
+    }
+    tick();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  Main Loop — Randomized Scheduler with Probability Gate
+  //
+  //  After the initial delay, each cycle:
+  //    1. Picks a random wait duration within [minInterval, maxInterval]
+  //    2. Counts down the wait
+  //    3. Rolls a probability check (e.g. 30%)
+  //    4. If passed → plays a random track with fade-in
+  //    5. Repeats
+  // ═══════════════════════════════════════════════════════════════════
+
+  function scheduleCycle() {
+    if (!isRunning) return;
+
+    const waitMs = randomInRange(getVal('minInterval'), getVal('maxInterval'));
+    const waitMin = (waitMs / 60000).toFixed(1);
+    log(`⏳ 下次循環: ${waitMin} 分鐘後`);
+
+    startCountdown(waitMs, '等待中', () => {
+      if (!isRunning) return;
+
+      const prob = getVal('probability') / 100;
+      const roll = Math.random();
+
+      if (roll < prob) {
+        phaseEl.textContent = '播放中';
+        playRandomTrack().then(() => {
+          // Short pause after playback before next cycle
+          setTimeout(() => { if (isRunning) scheduleCycle(); }, 3000);
+        });
+      } else {
+        log(`⏭ 跳過 (機率 ${(roll * 100).toFixed(0)}% > ${getVal('probability')}%)`, 'skipped');
+        scheduleCycle();
+      }
+    });
+  }
+
+  function startSession() {
+    if (!fileList.length) {
+      log('⚠️ 沒有可用的音訊檔，請先生成 filelist.json');
+      return;
+    }
+
+    isRunning = true;
+    debugMode = debugToggle.checked;
+    triggerCount = 0;
+    triggerCountEl.textContent = '0';
+
+    // Create AudioContext on user tap (iOS autoplay requirement)
+    if (!audioCtx) createAudioContext();
+
+    // Lock settings
+    settingsCard.style.opacity = '0.5';
+    settingsCard.style.pointerEvents = 'none';
+
+    startBtn.textContent = '⏹  停止';
+    startBtn.className = 'start-btn running';
+
+    // ─── Debug mode: skip everything, play immediately back-to-back ───
+    if (debugMode) {
+      log('⚡ Debug 模式：連續隨機播放，無延遲');
+      phaseEl.textContent = 'Debug';
+      countdownEl.textContent = '⚡';
+      playRandomTrack();
+      return;
+    }
+
+    const delayMs = getVal('initialDelay') * 60 * 1000;
+    log(`🌙 開始! 入睡緩衝: ${getVal('initialDelay')} 分鐘`);
+
+    startCountdown(delayMs, '入睡緩衝', () => {
+      log('⏰ 緩衝結束，開始循環');
+      scheduleCycle();
+    });
+  }
+
+  function stopSession() {
+    isRunning = false;
+    if (countdownId) { clearTimeout(countdownId); countdownId = null; }
+
+    // Clean up audio context
+    if (silentOsc) { silentOsc.stop(); silentOsc = null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+
+    // Unlock settings
+    settingsCard.style.opacity = '1';
+    settingsCard.style.pointerEvents = 'auto';
+
+    countdownEl.textContent = '--:--';
+    phaseEl.textContent = '已停止';
+    startBtn.textContent = '▶  開始';
+    startBtn.className = 'start-btn ready';
+
+    log('🛑 已停止');
+  }
+
+  // ─── Event binding ───
+  startBtn.addEventListener('click', () => {
+    if (isRunning) {
+      stopSession();
+    } else {
+      startSession();
+    }
+  });
+
+  // ─── Init ───
+  loadFileList();
+})();
+</script>
+</body>
+</html>
