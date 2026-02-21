@@ -571,56 +571,80 @@ input[type="range"]::-webkit-slider-thumb {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  //  Audio Playback with Fade-in Ramp
+  //  Audio Playback with Fade-in Ramp (HTML5 <audio> element)
   //
-  //  Uses Web Audio API GainNode for a smooth 2-second linear ramp
-  //  from silence to the user-configured volume cap. This prevents
-  //  sudden loud sounds that could jolt the user awake.
+  //  CRITICAL iOS FIX: We use HTML5 <audio> elements for voice track
+  //  playback instead of Web Audio API BufferSource. iOS keeps <audio>
+  //  elements alive through screen lock, but suspends Web Audio
+  //  buffer sources. The fade-in is implemented via a JS-driven
+  //  volume ramp using setInterval.
   // ═══════════════════════════════════════════════════════════════════
 
-  async function playRandomTrack() {
-    if (!fileList.length || !audioCtx) return;
+  function playRandomTrack() {
+    if (!fileList.length) return;
 
-    const file = fileList[Math.floor(Math.random() * fileList.length)];
+    // Filter out silence.mp3 from random selection
+    const playable = fileList.filter(f => f !== 'silence.mp3');
+    if (!playable.length) return;
+
+    const file = playable[Math.floor(Math.random() * playable.length)];
     const url = `audio/${file}`;
 
-    try {
-      const res = await fetch(url);
-      const arrayBuf = await res.arrayBuffer();
-      const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+    return new Promise((resolve) => {
+      try {
+        const audio = new Audio(url);
+        audio.setAttribute('playsinline', '');
 
-      const source = audioCtx.createBufferSource();
-      source.buffer = audioBuf;
+        const volumeCap = getVal('volumeCap') / 100;
 
-      // Fade-in gain node: 0 → volumeCap over 2 seconds (skip in debug)
-      const gainNode = audioCtx.createGain();
-      const volumeCap = getVal('volumeCap') / 100;
-      if (debugMode) {
-        gainNode.gain.value = volumeCap;
-      } else {
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(volumeCap, audioCtx.currentTime + 2);
-      }
+        if (debugMode) {
+          // Debug: instant volume, no fade
+          audio.volume = volumeCap;
+        } else {
+          // Fade-in: ramp from 0 → volumeCap over 2 seconds
+          audio.volume = 0;
+        }
 
-      source.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      source.start();
+        audio.play().then(() => {
+          // JS-driven fade-in (works on iOS lock screen unlike Web Audio GainNode)
+          if (!debugMode) {
+            const fadeMs = 2000;
+            const steps = 40;  // 40 steps over 2 seconds = 50ms per step
+            const stepMs = fadeMs / steps;
+            const increment = volumeCap / steps;
+            let currentStep = 0;
+            const fadeInterval = setInterval(() => {
+              currentStep++;
+              audio.volume = Math.min(increment * currentStep, volumeCap);
+              if (currentStep >= steps) clearInterval(fadeInterval);
+            }, stepMs);
+          }
+        }).catch((e) => {
+          log(`❌ 播放失敗: ${e.message}`);
+          resolve();
+        });
 
-      // In debug mode, schedule next track when this one ends
-      if (debugMode) {
-        source.onended = () => {
-          if (isRunning && debugMode) {
+        audio.onended = () => {
+          // In debug mode, chain next track immediately
+          if (debugMode && isRunning) {
             setTimeout(() => playRandomTrack(), 500);
           }
+          resolve();
         };
-      }
 
-      triggerCount++;
-      triggerCountEl.textContent = triggerCount;
-      log(`▶ 播放: ${file.slice(0, 8)}...`, 'played');
-    } catch (e) {
-      log(`❌ 播放失敗: ${e.message}`);
-    }
+        audio.onerror = () => {
+          log(`❌ 載入失敗: ${file}`);
+          resolve();
+        };
+
+        triggerCount++;
+        triggerCountEl.textContent = triggerCount;
+        log(`▶ 播放: ${file.slice(0, 8)}...`, 'played');
+      } catch (e) {
+        log(`❌ 播放失敗: ${e.message}`);
+        resolve();
+      }
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════
